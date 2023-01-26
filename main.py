@@ -68,7 +68,7 @@ def main():
     :return:
     """
     p = pipeline('auto-speech-recognition',
-                 'damo/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch')
+                 '/root/.cache/modelscope/hub/damo/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch')
     sources = get_files()
     for one in sources:
         path = one['path']
