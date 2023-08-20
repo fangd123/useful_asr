@@ -61,6 +61,28 @@ def get_subs(self, segments: Iterator[dict], format: str, maxLineWidth: int) -> 
     segmentStream.seek(0)
     return segmentStream.read()
 
+def text_segemnt(path:str):
+    with open(path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    text = data['text']
+    timestamps = data['time_stamp']
+
+    import re
+
+    sentences = re.split('[。？！，]', text)  # 使用正则表达式将文本分割成短句
+    sentences = [s.strip() for s in sentences if s.strip()]  # 去除短句中的空格和换行符
+
+    parttimes = []  # 存储每个短句的开始时间和结束时间
+
+    for sentence in sentences:
+        start_time, end_time = None, None
+        for i, char in enumerate(text):
+            if char in sentence:
+                if start_time is None:
+                    start_time = timestamps[i][0]
+                end_time = timestamps[i][1]
+        parttimes.append([start_time, end_time])
+
 
 def main():
     """
@@ -80,7 +102,7 @@ def main():
         new_result = {}
         new_result['text_punc'] = text['text_punc']
         new_result['time_stamp'] = text['time_stamp']
-        f.write(json.dumps(new_result,ensure_ascii=False))
+        f.write(json.dumps(new_result,ensure_ascii=False,indent=2))
         f.write('\n')
 
 
