@@ -4,6 +4,8 @@
 
 [English Version](README_EN.md)
 
+[知乎文章介绍](https://zhuanlan.zhihu.com/p/651156659)
+
 ### 语音转录服务
 
 这是一个基于 FastAPI 的语音转录服务。用户可以上传音频文件，服务会将其转换为文本。
