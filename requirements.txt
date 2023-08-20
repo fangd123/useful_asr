@@ -1,0 +1,5 @@
+modelscope
+funasr
+fastapi
+uvicorn
+python-multipart
