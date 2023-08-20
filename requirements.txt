@@ -4,3 +4,5 @@ fastapi
 uvicorn
 python-multipart
 pydub
+# 说话人日志相关
+umap-learn
