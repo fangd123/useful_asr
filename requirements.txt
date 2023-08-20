@@ -3,3 +3,4 @@ funasr
 fastapi
 uvicorn
 python-multipart
+pydub
