@@ -3,9 +3,9 @@ import os
 import subprocess
 import uuid
 from typing import List
-
+from fastapi.responses import FileResponse
 import soundfile
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, Query
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from modelscope.pipelines import pipeline
@@ -13,7 +13,8 @@ from modelscope.utils.constant import Tasks
 from pydub import AudioSegment
 
 inference_pipeline = pipeline('auto-speech-recognition',
-                              'damo/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch')
+                              'damo/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch',
+                              device='cpu')
 
 sd_pipeline = pipeline(
     task='speaker-diarization',
@@ -100,7 +101,14 @@ def find_speaker_for_ts(ts, speaker_data):
 
 
 @app.post("/transcribe/")
-async def transcribe_audio_file(file: UploadFile):
+async def transcribe_audio_file(file: UploadFile, distinct_speaker: bool = False, subtitle_file: bool = False):
+    """
+
+    :param file:
+    :param distinct_speaker:
+    :param subtitle_file:
+    :return:
+    """
     # Save the uploaded audio file
     audio_bytes = await file.read()
     temp_path = f"temp_{uuid.uuid4()}"
@@ -108,26 +116,34 @@ async def transcribe_audio_file(file: UploadFile):
         f.write(audio_bytes)
 
     # Convert the audio to the desired format
-    audio_path = f"{uuid.uuid4()}.wav"
+    filename_stem = uuid.uuid4()
+    audio_path = f"{filename_stem}.wav"
+
     convert_to_wav(temp_path, audio_path)
     os.remove(temp_path)  # remove the temporary file
 
     # Load the converted audio file and extract features
     sr = 16000
     waveform, samplerate = soundfile.read(audio_path)
-
-    # Call the ASR model to transcribe the audio
-    result = inference_pipeline(waveform)
-    sd_result = sd_pipeline(waveform)
-
     # Clean up the temporary audio file
     os.remove(audio_path)
+    # Call the ASR model to transcribe the audio
+    result = inference_pipeline(waveform)
     print(result)
-    if len(result['sentences']) == 1:
-        return [
-            {"text": result["text"], 'start': result['sentences'][0]["start"], 'end': result['sentences'][0]["end"]}]
-
     asr_data = result['sentences']
+    if not distinct_speaker:
+        if len(result['sentences']) == 1:
+            return [
+                {"text": result["text"], 'start': result['sentences'][0]["start"],
+                 'end': result['sentences'][0]["end"]}]
+        convert_to_srt(asr_data, f"{filename_stem}.srt")
+        if subtitle_file:
+            return FileResponse(f"{filename_stem}.srt",filename=f"{file.filename}.srt")
+        return asr_data
+
+
+
+    sd_result = sd_pipeline(waveform)
 
     for speaker_segment in sd_result["text"]:
         speaker_segment[0] = speaker_segment[0] * 1000
@@ -209,7 +225,36 @@ async def transcribe_audio_file(file: UploadFile):
         final_output.append(current_speaker_data)
 
     print(final_output)
+
     return final_output
+
+
+def extract_time(time_ms):
+    """Extract time from milliseconds"""
+    hour = time_ms // 3600000
+    minute = (time_ms % 3600000) // 60000
+    second = (time_ms % 60000) // 1000
+    millisecond = time_ms % 1000
+
+    return '{:02d}:{:02d}:{:02d},{:03d}'.format(hour, minute, second, millisecond)
+
+
+def convert_to_srt(transcript, output):
+    """Convert transcript to SRT format"""
+    srt = ''
+    # Generate SRT format
+    for i, seg in enumerate(transcript, 1):
+        start_time = extract_time(seg['start'])
+        end_time = extract_time(seg['end'])
+        text = seg['text']
+
+        srt += f'{i}\n{start_time} --> {end_time}\n{text}\n\n'
+
+    # Write to file
+    with open(output, 'w', encoding='utf-8') as f:
+        f.write(srt)
+
+    print('SRT file generated.')
 
 
 if __name__ == '__main__':
